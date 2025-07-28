@@ -9,7 +9,7 @@
 
 <div class="container">
     <div class="header">
-        <h1>🛒 PlanificaChef</h1>
+        <h1><i class="fas fa-shopping-cart"></i> PlanificaChef</h1>
         <p>Organiza tus compras y comidas de manera inteligente</p>
     </div>
 
@@ -28,7 +28,7 @@
         }
         else if (activeTab == "shopping")
         {
-            <ShoppingListView />
+            <ShoppingListView @ref="shoppingListView" />
         }
         else if (activeTab == "meals")
         {
@@ -47,15 +47,30 @@
 
 @code {
     private string activeTab = "dashboard";
+    private ShoppingListView? shoppingListView;
 
-    private void SetActiveTab(string tab)
+    private async Task SetActiveTab(string tab)
     {
         activeTab = tab;
-        StateHasChanged();
+        
+        // Si navegamos a shopping, recargar la lista después de que se renderice
+        if (tab == "shopping")
+        {
+            StateHasChanged();
+            await Task.Delay(100); // Pequeño delay para asegurar que el componente se renderize
+            if (shoppingListView != null)
+            {
+                await shoppingListView.RefreshListAsync();
+            }
+        }
+        else
+        {
+            StateHasChanged();
+        }
     }
 
     private async Task SetActiveTabCallback(string tab)
     {
-        SetActiveTab(tab);
+        await SetActiveTab(tab);
     }
 }

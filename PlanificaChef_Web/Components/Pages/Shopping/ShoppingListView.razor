@@ -2,7 +2,7 @@
 @using PlanificaChef_Web.Models
 @inject IShoppingListService ShoppingListService
 
-<h2 style="margin-bottom: 20px; color: #2c3e50;">🛍️ Lista de Compras - Supermercado</h2>
+<h2 style="margin-bottom: 20px; color: #2c3e50;"><i class="fas fa-shopping-bag"></i> Lista de Compras - Supermercado</h2>
 
 @if (currentList != null)
 {
@@ -25,7 +25,14 @@
                         <div class="item-actions">
                             <span class="item-price">$@item.EstimatedPrice.ToString("F2")</span>
                             <button class="btn-toggle" @onclick="() => ToggleItem(item.Id)">
-                                @(item.IsPurchased ? "✓" : "○")
+                                @if (item.IsPurchased)
+                                {
+                                    <i class="fas fa-check"></i>
+                                }
+                                else
+                                {
+                                    <i class="far fa-circle"></i>
+                                }
                             </button>
                         </div>
                     </div>
@@ -93,6 +100,12 @@ else
         {
             Console.WriteLine($"Error creating new list: {ex.Message}");
         }
+    }
+
+    public async Task RefreshListAsync()
+    {
+        await LoadCurrentList();
+        StateHasChanged();
     }
 }
 

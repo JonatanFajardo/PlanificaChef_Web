@@ -4,13 +4,13 @@
 @inject IRecipeService RecipeService
 @inject IShoppingListService ShoppingListService
 
-<h2 style="margin-bottom: 20px; color: #2c3e50;">🍽️ Planificador de Comidas</h2>
+<h2 style="margin-bottom: 20px; color: #2c3e50;"><i class="fas fa-utensils"></i> Planificador de Comidas</h2>
 
 <div style="display: flex; gap: 15px; margin-bottom: 25px; flex-wrap: wrap;">
     <button class="btn btn-primary" @onclick="ShowWeekView">Vista Semanal</button>
     <button class="btn btn-outline" @onclick="ShowDayView">Vista Diaria</button>
     <button class="btn btn-outline" @onclick="OpenRecipeModal">+ Nuevo Platillo</button>
-    <button class="btn btn-outline" @onclick="ShowRecipeManagement">🍽️ Mis Platillos</button>
+    <button class="btn btn-outline" @onclick="ShowRecipeManagement"><i class="fas fa-utensils"></i> Mis Platillos</button>
 </div>
 
 <div class="week-planner">
@@ -54,11 +54,11 @@
             disabled="@isSaving">
         @if (isSaving)
         {
-            <span>🔄 Guardando...</span>
+            <span><i class="fas fa-spinner fa-spin"></i> Guardando...</span>
         }
         else
         {
-            <span>💾 Guardar Plan Semanal</span>
+            <span><i class="fas fa-save"></i> Guardar Plan Semanal</span>
         }
     </button>
     <button class="btn btn-outline @(isExporting ? "loading" : "")" 
@@ -66,11 +66,11 @@
             disabled="@isExporting">
         @if (isExporting)
         {
-            <span>🔄 Exportando...</span>
+            <span><i class="fas fa-spinner fa-spin"></i> Exportando...</span>
         }
         else
         {
-            <span>📋 Exportar a Lista de Compras</span>
+            <span><i class="fas fa-file-export"></i> Exportar a Lista de Compras</span>
         }
     </button>
 </div>
@@ -337,9 +337,9 @@
                 return;
             }
 
-            // Crear nueva lista de compras
+            // Crear nueva lista de compras (marcando las anteriores como completadas)
             var listName = $"Plan Semanal {startDate:dd/MM} - {endDate:dd/MM}";
-            var shoppingList = await ShoppingListService.CreateShoppingListAsync(listName);
+            var shoppingList = await ShoppingListService.CreateNewActiveShoppingListAsync(listName);
 
             // Agregar ingredientes a la lista
             var totalItems = 0;

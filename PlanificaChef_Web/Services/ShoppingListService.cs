@@ -115,6 +115,31 @@ public class ShoppingListService : IShoppingListService
             .SumAsync(sli => sli.EstimatedPrice);
     }
 
+    public async Task<ShoppingList> CreateNewActiveShoppingListAsync(string name)
+    {
+        // Marcar todas las listas existentes como completadas
+        var activeLists = await _context.ShoppingLists
+            .Where(sl => !sl.IsCompleted)
+            .ToListAsync();
+            
+        foreach (var list in activeLists)
+        {
+            list.IsCompleted = true;
+        }
+
+        // Crear nueva lista activa
+        var newList = new ShoppingList
+        {
+            Name = name,
+            CreatedAt = DateTime.UtcNow,
+            IsCompleted = false
+        };
+
+        _context.ShoppingLists.Add(newList);
+        await _context.SaveChangesAsync();
+        return newList;
+    }
+
     private async Task UpdateListTotalAsync(int shoppingListId)
     {
         var shoppingList = await _context.ShoppingLists.FindAsync(shoppingListId);

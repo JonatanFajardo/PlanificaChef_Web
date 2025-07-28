@@ -14,4 +14,5 @@ public interface IShoppingListService
     Task RemoveItemFromListAsync(int itemId);
     Task MarkItemAsPurchasedAsync(int itemId);
     Task<decimal> CalculateListTotalAsync(int shoppingListId);
+    Task<ShoppingList> CreateNewActiveShoppingListAsync(string name);
 }

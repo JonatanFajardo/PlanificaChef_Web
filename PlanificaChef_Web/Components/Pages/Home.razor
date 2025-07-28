@@ -1,0 +1,61 @@
+@page "/"
+@using PlanificaChef_Web.Services
+@inject IRecipeService RecipeService
+@inject IShoppingListService ShoppingListService
+@inject IMealPlanService MealPlanService
+@rendermode InteractiveServer
+
+<PageTitle>PlanificaChef</PageTitle>
+
+<div class="container">
+    <div class="header">
+        <h1>🛒 PlanificaChef</h1>
+        <p>Organiza tus compras y comidas de manera inteligente</p>
+    </div>
+
+    <div class="nav-tabs">
+        <button class="nav-tab @(activeTab == "dashboard" ? "active" : "")" @onclick='() => SetActiveTab("dashboard")'>Dashboard</button>
+        <button class="nav-tab @(activeTab == "shopping" ? "active" : "")" @onclick='() => SetActiveTab("shopping")'>Lista Activa</button>
+        <button class="nav-tab @(activeTab == "meals" ? "active" : "")" @onclick='() => SetActiveTab("meals")'>Planificador</button>
+        <button class="nav-tab @(activeTab == "products" ? "active" : "")" @onclick='() => SetActiveTab("products")'>Productos</button>
+        <button class="nav-tab @(activeTab == "history" ? "active" : "")" @onclick='() => SetActiveTab("history")'>Historial</button>
+    </div>
+
+    <div class="content">
+        @if (activeTab == "dashboard")
+        {
+            <Dashboard OnTabChange="SetActiveTabCallback" />
+        }
+        else if (activeTab == "shopping")
+        {
+            <ShoppingListView />
+        }
+        else if (activeTab == "meals")
+        {
+            <MealPlanner />
+        }
+        else if (activeTab == "products")
+        {
+            <ProductCatalog />
+        }
+        else if (activeTab == "history")
+        {
+            <HistoryView />
+        }
+    </div>
+</div>
+
+@code {
+    private string activeTab = "dashboard";
+
+    private void SetActiveTab(string tab)
+    {
+        activeTab = tab;
+        StateHasChanged();
+    }
+
+    private async Task SetActiveTabCallback(string tab)
+    {
+        SetActiveTab(tab);
+    }
+}

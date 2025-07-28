@@ -1,0 +1,207 @@
+@using PlanificaChef_Web.Services
+@using PlanificaChef_Web.Models
+@inject IShoppingListService ShoppingListService
+
+<h2 style="margin-bottom: 20px; color: #2c3e50;">🛍️ Lista de Compras - Supermercado</h2>
+
+@if (currentList != null)
+{
+    <div class="shopping-list-container">
+        <div class="list-header">
+            <h3>@currentList.Name</h3>
+            <p>Total estimado: $@currentList.TotalEstimated.ToString("F2")</p>
+        </div>
+
+        @if (currentList.Items.Any())
+        {
+            <div class="items-list">
+                @foreach (var item in currentList.Items)
+                {
+                    <div class="item @(item.IsPurchased ? "purchased" : "")">
+                        <div class="item-info">
+                            <span class="item-name">@item.Ingredient.Name</span>
+                            <span class="item-quantity">@item.Quantity</span>
+                        </div>
+                        <div class="item-actions">
+                            <span class="item-price">$@item.EstimatedPrice.ToString("F2")</span>
+                            <button class="btn-toggle" @onclick="() => ToggleItem(item.Id)">
+                                @(item.IsPurchased ? "✓" : "○")
+                            </button>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+        else
+        {
+            <p>No hay productos en la lista actual.</p>
+        }
+    </div>
+}
+else
+{
+    <div class="empty-state">
+        <p>No tienes una lista de compras activa.</p>
+        <button class="btn btn-primary" @onclick="CreateNewList">Crear Nueva Lista</button>
+    </div>
+}
+
+@code {
+    private ShoppingList? currentList;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCurrentList();
+    }
+
+    private async Task LoadCurrentList()
+    {
+        try
+        {
+            currentList = await ShoppingListService.GetActiveShoppingListAsync();
+        }
+        catch (Exception ex)
+        {
+            // Handle error
+            Console.WriteLine($"Error loading shopping list: {ex.Message}");
+        }
+    }
+
+    private async Task ToggleItem(int itemId)
+    {
+        try
+        {
+            await ShoppingListService.MarkItemAsPurchasedAsync(itemId);
+            await LoadCurrentList();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error toggling item: {ex.Message}");
+        }
+    }
+
+    private async Task CreateNewList()
+    {
+        try
+        {
+            var newList = await ShoppingListService.CreateShoppingListAsync($"Lista {DateTime.Now:dd/MM/yyyy}");
+            await LoadCurrentList();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error creating new list: {ex.Message}");
+        }
+    }
+}
+
+<style>
+    .shopping-list-container {
+        background: white;
+        border-radius: 15px;
+        padding: 25px;
+        box-shadow: 0 8px 25px rgba(0,0,0,0.08);
+    }
+
+    .list-header {
+        margin-bottom: 25px;
+        padding-bottom: 15px;
+        border-bottom: 2px solid #f1f3f4;
+    }
+
+    .list-header h3 {
+        color: #2c3e50;
+        margin-bottom: 5px;
+    }
+
+    .items-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 15px;
+        border: 2px solid #e9ecef;
+        border-radius: 10px;
+        transition: all 0.3s ease;
+    }
+
+    .item.purchased {
+        background: #f8f9fa;
+        opacity: 0.7;
+        text-decoration: line-through;
+    }
+
+    .item-info {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+    }
+
+    .item-name {
+        font-weight: 600;
+        color: #2c3e50;
+    }
+
+    .item-quantity {
+        font-size: 0.9em;
+        color: #6c757d;
+    }
+
+    .item-actions {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+    }
+
+    .item-price {
+        font-weight: bold;
+        color: #28a745;
+    }
+
+    .btn-toggle {
+        width: 30px;
+        height: 30px;
+        border: none;
+        border-radius: 50%;
+        cursor: pointer;
+        background: #f8f9fa;
+        border: 2px solid #e9ecef;
+        transition: all 0.3s ease;
+    }
+
+    .btn-toggle:hover {
+        background: #28a745;
+        color: white;
+        border-color: #28a745;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 50px;
+    }
+
+    .btn {
+        padding: 12px 20px;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 500;
+        transition: all 0.3s ease;
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+    }
+
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 15px rgba(102, 126, 234, 0.4);
+    }
+</style>

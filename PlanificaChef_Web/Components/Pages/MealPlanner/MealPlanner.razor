@@ -1,0 +1,530 @@
+@using PlanificaChef_Web.Services
+@using PlanificaChef_Web.Models
+@inject IMealPlanService MealPlanService
+@inject IRecipeService RecipeService
+@inject IShoppingListService ShoppingListService
+
+<h2 style="margin-bottom: 20px; color: #2c3e50;">🍽️ Planificador de Comidas</h2>
+
+<div style="display: flex; gap: 15px; margin-bottom: 25px; flex-wrap: wrap;">
+    <button class="btn btn-primary" @onclick="ShowWeekView">Vista Semanal</button>
+    <button class="btn btn-outline" @onclick="ShowDayView">Vista Diaria</button>
+    <button class="btn btn-outline" @onclick="OpenRecipeModal">+ Nuevo Platillo</button>
+    <button class="btn btn-outline" @onclick="ShowRecipeManagement">🍽️ Mis Platillos</button>
+</div>
+
+<div class="week-planner">
+    @for (int i = 0; i < 7; i++)
+    {
+        var date = GetWeekStartDate().AddDays(i);
+        var dayPlan = weekPlans.FirstOrDefault(p => p.Date.Date == date.Date);
+        var dayName = GetDayName(i);
+
+        <div class="day-planner">
+            <div class="day-header">
+                <div class="day-name">@dayName</div>
+                <div class="day-cost">$@(dayPlan?.DayTotalCost.ToString("F2") ?? "0.00")</div>
+            </div>
+            <div class="meal-slots">
+                <div class="meal-slot @(HasBreakfast(dayPlan) ? "filled" : "empty")" 
+                     @onclick="() => SelectMealSlot(date, MealType.Breakfast)">
+                    @(GetMealName(dayPlan?.BreakfastRecipe) ?? "+ Elegir desayuno")
+                </div>
+                <div class="meal-slot @(HasLunch(dayPlan) ? "filled" : "empty")" 
+                     @onclick="() => SelectMealSlot(date, MealType.Lunch)">
+                    @(GetMealName(dayPlan?.LunchRecipe) ?? "+ Elegir almuerzo")
+                </div>
+                <div class="meal-slot @(HasSnack(dayPlan) ? "filled" : "empty")" 
+                     @onclick="() => SelectMealSlot(date, MealType.Snack)">
+                    @(GetMealName(dayPlan?.SnackRecipe) ?? "+ Elegir merienda")
+                </div>
+                <div class="meal-slot @(HasDinner(dayPlan) ? "filled" : "empty")" 
+                     @onclick="() => SelectMealSlot(date, MealType.Dinner)">
+                    @(GetMealName(dayPlan?.DinnerRecipe) ?? "+ Elegir cena")
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<div style="margin-top: 30px; text-align: center;">
+    <button class="btn btn-primary @(isSaving ? "loading" : "")" 
+            style="margin-right: 15px;" 
+            @onclick="SaveWeekPlan" 
+            disabled="@isSaving">
+        @if (isSaving)
+        {
+            <span>🔄 Guardando...</span>
+        }
+        else
+        {
+            <span>💾 Guardar Plan Semanal</span>
+        }
+    </button>
+    <button class="btn btn-outline @(isExporting ? "loading" : "")" 
+            @onclick="ExportToShoppingList" 
+            disabled="@isExporting">
+        @if (isExporting)
+        {
+            <span>🔄 Exportando...</span>
+        }
+        else
+        {
+            <span>📋 Exportar a Lista de Compras</span>
+        }
+    </button>
+</div>
+
+@if (!string.IsNullOrEmpty(saveMessage))
+{
+    <div class="save-notification @(saveSuccess ? "success" : "error")" style="margin-top: 20px; text-align: center;">
+        @saveMessage
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(exportMessage))
+{
+    <div class="save-notification @(exportSuccess ? "success" : "error")" style="margin-top: 20px; text-align: center;">
+        @exportMessage
+    </div>
+}
+
+@if (showRecipeModal)
+{
+    <RecipeModal OnClose="CloseRecipeModal" OnRecipeCreated="OnRecipeCreated" />
+}
+
+@if (showRecipeGallery)
+{
+    <RecipeGallery OnClose="CloseRecipeGallery" OnRecipeSelected="OnRecipeSelected" />
+}
+
+@if (showRecipeManagement)
+{
+    <RecipeManagementModal OnClose="CloseRecipeManagement" OnRecipeChanged="OnRecipeChanged" />
+}
+
+@code {
+    private List<MealPlan> weekPlans = new();
+    private List<Recipe> availableRecipes = new();
+    private bool showRecipeModal = false;
+    private bool showRecipeGallery = false;
+    private bool showRecipeManagement = false;
+    private DateTime? selectedDate;
+    private MealType? selectedMealType;
+    private bool isSaving = false;
+    private string? saveMessage = null;
+    private bool saveSuccess = false;
+    private bool isExporting = false;
+    private string? exportMessage = null;
+    private bool exportSuccess = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadWeekPlans();
+        await LoadRecipes();
+    }
+
+    private async Task LoadWeekPlans()
+    {
+        try
+        {
+            var startDate = GetWeekStartDate();
+            weekPlans = await MealPlanService.GetWeekMealPlanAsync(startDate);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading meal plans: {ex.Message}");
+        }
+    }
+
+    private async Task LoadRecipes()
+    {
+        try
+        {
+            availableRecipes = await RecipeService.GetAllRecipesAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading recipes: {ex.Message}");
+        }
+    }
+
+    private DateTime GetWeekStartDate()
+    {
+        var today = DateTime.Today;
+        var daysFromMonday = ((int)today.DayOfWeek - 1 + 7) % 7;
+        return today.AddDays(-daysFromMonday);
+    }
+
+    private string GetDayName(int dayIndex)
+    {
+        var days = new[] { "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo" };
+        return days[dayIndex];
+    }
+
+    private bool HasBreakfast(MealPlan? plan) => plan?.BreakfastRecipe != null;
+    private bool HasLunch(MealPlan? plan) => plan?.LunchRecipe != null;
+    private bool HasSnack(MealPlan? plan) => plan?.SnackRecipe != null;
+    private bool HasDinner(MealPlan? plan) => plan?.DinnerRecipe != null;
+
+    private string? GetMealName(Recipe? recipe) => recipe?.Name;
+
+    private void SelectMealSlot(DateTime date, MealType mealType)
+    {
+        selectedDate = date;
+        selectedMealType = mealType;
+        showRecipeGallery = true;
+    }
+
+    private void ShowWeekView() { /* Already showing week view */ }
+    private void ShowDayView() { /* TODO: Implement day view */ }
+    private void OpenRecipeModal() => showRecipeModal = true;
+    private void ShowRecipeGallery() => showRecipeGallery = true;
+    private void ShowRecipeManagement() => showRecipeManagement = true;
+
+    private void CloseRecipeModal() => showRecipeModal = false;
+    private void CloseRecipeGallery() => showRecipeGallery = false;
+    private void CloseRecipeManagement() => showRecipeManagement = false;
+
+    private async Task OnRecipeCreated()
+    {
+        await LoadRecipes();
+        CloseRecipeModal();
+    }
+
+    private async Task OnRecipeChanged()
+    {
+        await LoadRecipes();
+        await LoadWeekPlans(); // Recargar planes para actualizar información
+    }
+
+    private async Task OnRecipeSelected(Recipe recipe)
+    {
+        if (selectedDate.HasValue && selectedMealType.HasValue)
+        {
+            await AssignRecipeToSlot(selectedDate.Value, selectedMealType.Value, recipe);
+        }
+        CloseRecipeGallery();
+    }
+
+    private async Task AssignRecipeToSlot(DateTime date, MealType mealType, Recipe recipe)
+    {
+        try
+        {
+            var currentPlan = weekPlans.FirstOrDefault(p => p.Date.Date == date.Date);
+            
+            int? breakfastId = currentPlan?.BreakfastRecipeId;
+            int? lunchId = currentPlan?.LunchRecipeId;
+            int? snackId = currentPlan?.SnackRecipeId;
+            int? dinnerId = currentPlan?.DinnerRecipeId;
+
+            switch (mealType)
+            {
+                case MealType.Breakfast: breakfastId = recipe.Id; break;
+                case MealType.Lunch: lunchId = recipe.Id; break;
+                case MealType.Snack: snackId = recipe.Id; break;
+                case MealType.Dinner: dinnerId = recipe.Id; break;
+            }
+
+            await MealPlanService.CreateOrUpdateMealPlanAsync(date, breakfastId, lunchId, snackId, dinnerId);
+            await LoadWeekPlans();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error assigning recipe: {ex.Message}");
+        }
+    }
+
+    private async Task SaveWeekPlan()
+    {
+        try
+        {
+            isSaving = true;
+            saveMessage = null;
+            StateHasChanged();
+
+            // Validar que al menos tenga algunas comidas planificadas
+            var hasAnyMeals = weekPlans.Any(plan => 
+                plan.BreakfastRecipeId.HasValue || 
+                plan.LunchRecipeId.HasValue || 
+                plan.SnackRecipeId.HasValue || 
+                plan.DinnerRecipeId.HasValue);
+
+            if (!hasAnyMeals)
+            {
+                saveMessage = "⚠️ No hay comidas planificadas para guardar";
+                saveSuccess = false;
+                return;
+            }
+
+            // Calcular estadísticas del plan
+            var totalDays = weekPlans.Count(plan => 
+                plan.BreakfastRecipeId.HasValue || 
+                plan.LunchRecipeId.HasValue || 
+                plan.SnackRecipeId.HasValue || 
+                plan.DinnerRecipeId.HasValue);
+            
+            var totalMeals = weekPlans.Sum(plan => 
+                (plan.BreakfastRecipeId.HasValue ? 1 : 0) +
+                (plan.LunchRecipeId.HasValue ? 1 : 0) +
+                (plan.SnackRecipeId.HasValue ? 1 : 0) +
+                (plan.DinnerRecipeId.HasValue ? 1 : 0));
+
+            var totalCost = weekPlans.Sum(plan => plan.DayTotalCost);
+
+            // Simular una pequeña pausa para mostrar el estado de carga
+            await Task.Delay(1000);
+
+            // Como los planes ya se guardan automáticamente cuando se asignan,
+            // aquí podríamos hacer validaciones adicionales o recalcular totales
+            await LoadWeekPlans(); // Recargar para asegurar datos actualizados
+
+            saveMessage = $"✅ Plan semanal guardado exitosamente: {totalMeals} comidas en {totalDays} días (${totalCost:F2})";
+            saveSuccess = true;
+        }
+        catch (Exception ex)
+        {
+            saveMessage = $"❌ Error al guardar el plan: {ex.Message}";
+            saveSuccess = false;
+        }
+        finally
+        {
+            isSaving = false;
+            StateHasChanged();
+            
+            // Limpiar mensaje después de 5 segundos
+            _ = Task.Delay(5000).ContinueWith(_ => {
+                saveMessage = null;
+                InvokeAsync(StateHasChanged);
+            });
+        }
+    }
+
+    private async Task ExportToShoppingList()
+    {
+        try
+        {
+            isExporting = true;
+            exportMessage = null;
+            StateHasChanged();
+
+            var startDate = GetWeekStartDate();
+            var endDate = startDate.AddDays(6);
+            
+            // Verificar que haya planes para exportar
+            var hasPlans = weekPlans.Any(plan => 
+                plan.BreakfastRecipeId.HasValue || 
+                plan.LunchRecipeId.HasValue || 
+                plan.SnackRecipeId.HasValue || 
+                plan.DinnerRecipeId.HasValue);
+
+            if (!hasPlans)
+            {
+                exportMessage = "⚠️ No hay comidas planificadas para exportar";
+                exportSuccess = false;
+                return;
+            }
+
+            // Generar lista de ingredientes
+            var ingredients = await MealPlanService.GenerateShoppingListFromWeekPlanAsync(startDate);
+            
+            if (!ingredients.Any())
+            {
+                exportMessage = "⚠️ No se encontraron ingredientes en las recetas planificadas";
+                exportSuccess = false;
+                return;
+            }
+
+            // Crear nueva lista de compras
+            var listName = $"Plan Semanal {startDate:dd/MM} - {endDate:dd/MM}";
+            var shoppingList = await ShoppingListService.CreateShoppingListAsync(listName);
+
+            // Agregar ingredientes a la lista
+            var totalItems = 0;
+            var totalCost = 0m;
+
+            // Agrupar ingredientes iguales
+            var groupedIngredients = ingredients
+                .GroupBy(i => i.Id)
+                .Select(g => new { 
+                    Ingredient = g.First(),
+                    Count = g.Count()
+                });
+
+            foreach (var group in groupedIngredients)
+            {
+                var estimatedPrice = group.Ingredient.BasePrice * group.Count;
+                var quantity = group.Count > 1 ? $"{group.Count} unidades" : "1 unidad";
+
+                await ShoppingListService.AddItemToListAsync(
+                    shoppingList.Id,
+                    group.Ingredient.Id,
+                    quantity,
+                    estimatedPrice
+                );
+
+                totalItems++;
+                totalCost += estimatedPrice;
+            }
+
+            exportMessage = $"✅ Lista creada exitosamente: '{listName}' con {totalItems} productos (${totalCost:F2})";
+            exportSuccess = true;
+        }
+        catch (Exception ex)
+        {
+            exportMessage = $"❌ Error al crear lista de compras: {ex.Message}";
+            exportSuccess = false;
+            Console.WriteLine($"Error exporting to shopping list: {ex.Message}");
+        }
+        finally
+        {
+            isExporting = false;
+            StateHasChanged();
+            
+            // Limpiar mensaje después de 5 segundos
+            _ = Task.Delay(5000).ContinueWith(_ => {
+                exportMessage = null;
+                InvokeAsync(StateHasChanged);
+            });
+        }
+    }
+}
+
+<style>
+    .week-planner {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+
+    .day-planner {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+    }
+
+    .day-header {
+        text-align: center;
+        margin-bottom: 15px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #f1f3f4;
+    }
+
+    .day-name {
+        font-weight: 600;
+        color: #2c3e50;
+    }
+
+    .day-cost {
+        color: #28a745;
+        font-size: 0.9em;
+        margin-top: 5px;
+    }
+
+    .meal-slots {
+        display: grid;
+        gap: 8px;
+    }
+
+    .meal-slot {
+        padding: 10px;
+        border: 2px dashed #dee2e6;
+        border-radius: 8px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        min-height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.9em;
+    }
+
+    .meal-slot.empty {
+        color: #6c757d;
+    }
+
+    .meal-slot.filled {
+        background: #e8f5e8;
+        border-color: #28a745;
+        color: #155724;
+        font-weight: 500;
+    }
+
+    .meal-slot:hover {
+        background: #f8f9fa;
+        border-color: #adb5bd;
+    }
+
+    .btn {
+        padding: 12px 20px;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 500;
+        transition: all 0.3s ease;
+        text-decoration: none;
+        display: inline-block;
+        font-size: 14px;
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+    }
+
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 15px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn-outline {
+        background: transparent;
+        border: 2px solid #667eea;
+        color: #667eea;
+    }
+
+    .btn-outline:hover {
+        background: #667eea;
+        color: white;
+    }
+
+    .btn.loading {
+        opacity: 0.7;
+        cursor: not-allowed;
+    }
+
+    .btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+    }
+
+    .save-notification {
+        padding: 15px 20px;
+        border-radius: 10px;
+        font-weight: 500;
+        margin: 0 auto;
+        max-width: 600px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        transition: all 0.3s ease-out;
+    }
+
+    .save-notification.success {
+        background: linear-gradient(135deg, #d4edda, #c3e6cb);
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+
+    .save-notification.error {
+        background: linear-gradient(135deg, #f8d7da, #f5c6cb);
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+    }
+
+
+</style>

@@ -1,0 +1,360 @@
+@using PlanificaChef_Web.Models
+@using PlanificaChef_Web.Services
+@inject IRecipeService RecipeService
+@inject IIngredientService IngredientService
+
+<div class="recipe-modal active">
+    <div class="modal-content" style="max-width: 900px;">
+        <div class="modal-header">
+            <h3>🍽️ Mis Platillos - Gestión</h3>
+            <button class="close-modal" @onclick="CloseModal">×</button>
+        </div>
+
+        <div class="management-container">
+            @if (recipes.Any())
+            {
+                <div class="recipes-grid">
+                    @foreach (var recipe in recipes)
+                    {
+                        <div class="recipe-management-card">
+                            <div class="recipe-header">
+                                <div class="recipe-name">@recipe.Name</div>
+                                <div class="recipe-type">@GetMealTypeDisplayName(recipe.MealType)</div>
+                            </div>
+                            <div class="recipe-details">
+                                <div class="recipe-price">$@recipe.TotalPrice.ToString("F2")</div>
+                                <div class="recipe-meta">@recipe.Ingredients.Count ingredientes • @recipe.PreparationTimeMinutes min</div>
+                            </div>
+                            <div class="recipe-actions">
+                                <button class="btn btn-outline" @onclick="() => EditRecipe(recipe)">✏️ Editar</button>
+                                <button class="btn btn-danger" @onclick="() => DeleteRecipe(recipe.Id)">🗑️ Eliminar</button>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="empty-state">
+                    <p>No tienes platillos creados aún.</p>
+                    <p>Usa el botón "+ Nuevo Platillo" para crear tu primera receta.</p>
+                </div>
+            }
+        </div>
+
+        @if (!string.IsNullOrEmpty(statusMessage))
+        {
+            <div class="status-notification @(statusSuccess ? "success" : "error")">
+                @statusMessage
+            </div>
+        }
+
+        <div style="text-align: center; margin-top: 20px;">
+            <button class="btn btn-outline" @onclick="CloseModal">Cerrar</button>
+        </div>
+    </div>
+</div>
+
+@if (showEditModal && editingRecipe != null)
+{
+    <RecipeEditModal Recipe="editingRecipe" 
+                     OnClose="CloseEditModal" 
+                     OnRecipeUpdated="OnRecipeUpdated" />
+}
+
+@code {
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public EventCallback OnRecipeChanged { get; set; }
+
+    private List<Recipe> recipes = new();
+    private bool showEditModal = false;
+    private Recipe? editingRecipe = null;
+    private string? statusMessage = null;
+    private bool statusSuccess = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadRecipes();
+    }
+
+    private async Task LoadRecipes()
+    {
+        try
+        {
+            recipes = await RecipeService.GetAllRecipesAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading recipes: {ex.Message}");
+            recipes = new List<Recipe>();
+        }
+    }
+
+    private void EditRecipe(Recipe recipe)
+    {
+        editingRecipe = recipe;
+        showEditModal = true;
+    }
+
+    private async Task DeleteRecipe(int recipeId)
+    {
+        try
+        {
+            var recipe = recipes.FirstOrDefault(r => r.Id == recipeId);
+            if (recipe != null)
+            {
+                await RecipeService.DeleteRecipeAsync(recipeId);
+                await LoadRecipes();
+                await OnRecipeChanged.InvokeAsync();
+                
+                statusMessage = $"✅ Platillo '{recipe.Name}' eliminado exitosamente";
+                statusSuccess = true;
+                ClearStatusAfterDelay();
+            }
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"❌ Error al eliminar platillo: {ex.Message}";
+            statusSuccess = false;
+            ClearStatusAfterDelay();
+        }
+    }
+
+    private async Task OnRecipeUpdated()
+    {
+        await LoadRecipes();
+        await OnRecipeChanged.InvokeAsync();
+        showEditModal = false;
+        editingRecipe = null;
+        
+        statusMessage = "✅ Platillo actualizado exitosamente";
+        statusSuccess = true;
+        ClearStatusAfterDelay();
+    }
+
+    private void CloseEditModal()
+    {
+        showEditModal = false;
+        editingRecipe = null;
+    }
+
+    private async Task CloseModal()
+    {
+        await OnClose.InvokeAsync();
+    }
+
+    private void ClearStatusAfterDelay()
+    {
+        _ = Task.Delay(3000).ContinueWith(_ => {
+            statusMessage = null;
+            InvokeAsync(StateHasChanged);
+        });
+    }
+
+    private string GetMealTypeDisplayName(MealType mealType)
+    {
+        return mealType switch
+        {
+            MealType.Breakfast => "Desayuno",
+            MealType.Lunch => "Almuerzo",
+            MealType.Snack => "Merienda",
+            MealType.Dinner => "Cena",
+            _ => mealType.ToString()
+        };
+    }
+}
+
+<style>
+    .recipe-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.5);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+    }
+
+    .modal-content {
+        background: white;
+        border-radius: 15px;
+        padding: 30px;
+        max-width: 800px;
+        width: 90%;
+        max-height: 80vh;
+        overflow-y: auto;
+        position: relative;
+    }
+
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 25px;
+        border-bottom: 2px solid #f1f3f4;
+        padding-bottom: 15px;
+    }
+
+    .close-modal {
+        background: none;
+        border: none;
+        font-size: 24px;
+        cursor: pointer;
+        color: #6c757d;
+        padding: 5px;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .close-modal:hover {
+        background: #f1f3f4;
+        color: #495057;
+    }
+
+    .management-container {
+        min-height: 300px;
+    }
+
+    .recipes-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 20px;
+        margin-bottom: 25px;
+    }
+
+    .recipe-management-card {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        border: 2px solid #e9ecef;
+        transition: all 0.3s ease;
+    }
+
+    .recipe-management-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.12);
+        border-color: #667eea;
+    }
+
+    .recipe-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 15px;
+    }
+
+    .recipe-name {
+        font-weight: 600;
+        color: #2c3e50;
+        font-size: 1.1em;
+        flex: 1;
+    }
+
+    .recipe-type {
+        background: #e3f2fd;
+        color: #1976d2;
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 0.8em;
+        font-weight: 500;
+        margin-left: 10px;
+    }
+
+    .recipe-details {
+        margin-bottom: 15px;
+    }
+
+    .recipe-price {
+        font-size: 1.2em;
+        font-weight: bold;
+        color: #28a745;
+        margin-bottom: 5px;
+    }
+
+    .recipe-meta {
+        color: #6c757d;
+        font-size: 0.9em;
+    }
+
+    .recipe-actions {
+        display: flex;
+        gap: 10px;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 40px 20px;
+        color: #6c757d;
+    }
+
+    .empty-state p {
+        margin-bottom: 10px;
+    }
+
+    .status-notification {
+        padding: 12px 20px;
+        border-radius: 8px;
+        margin: 20px 0;
+        text-align: center;
+        font-weight: 500;
+    }
+
+    .status-notification.success {
+        background: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+
+    .status-notification.error {
+        background: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+    }
+
+    .btn {
+        padding: 8px 16px;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: 500;
+        transition: all 0.3s ease;
+        font-size: 14px;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    .btn-outline {
+        background: transparent;
+        border: 2px solid #667eea;
+        color: #667eea;
+    }
+
+    .btn-outline:hover {
+        background: #667eea;
+        color: white;
+    }
+
+    .btn-danger {
+        background: #dc3545;
+        color: white;
+        border: 2px solid #dc3545;
+    }
+
+    .btn-danger:hover {
+        background: #c82333;
+        border-color: #c82333;
+    }
+
+    .btn:hover {
+        transform: translateY(-1px);
+    }
+</style>

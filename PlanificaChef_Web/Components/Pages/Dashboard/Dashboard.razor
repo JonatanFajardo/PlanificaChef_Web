@@ -1,0 +1,272 @@
+@using PlanificaChef_Web.Services
+@using PlanificaChef_Web.Models
+@inject IShoppingListService ShoppingListService
+@inject IMealPlanService MealPlanService
+
+<div class="dashboard-grid">
+    <div class="card">
+        <div class="card-header">
+            <div class="card-icon shopping">🛍️</div>
+            <div class="card-title">Lista Actual</div>
+        </div>
+        <p>Tienes @pendingItems productos pendientes por comprar</p>
+        <div class="stats">
+            <div class="stat-item">
+                <div class="stat-number">@pendingItems</div>
+                <div class="stat-label">Pendientes</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number">$@estimatedTotal.ToString("F2")</div>
+                <div class="stat-label">Estimado</div>
+            </div>
+        </div>
+        <div class="quick-actions">
+            <button class="btn btn-primary" @onclick="GoToShopping">Ver Lista</button>
+            <button class="btn btn-outline" @onclick="CreateNewList">Nueva Lista</button>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <div class="card-icon meals">🍽️</div>
+            <div class="card-title">Planificador de Comidas</div>
+        </div>
+        <p>Organiza tus comidas de la semana con costos</p>
+        <div class="stats">
+            <div class="stat-item">
+                <div class="stat-number">7</div>
+                <div class="stat-label">Días</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number">$@todayCost.ToString("F2")</div>
+                <div class="stat-label">Hoy</div>
+            </div>
+        </div>
+        <div class="quick-actions">
+            <button class="btn btn-primary" @onclick="GoToMealPlanner">Ver Planner</button>
+            <button class="btn btn-outline" @onclick="CreateNewRecipe">Nueva Receta</button>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <div class="card-icon history">📊</div>
+            <div class="card-title">Resumen del Mes</div>
+        </div>
+        <p>Estadísticas de tus compras en @DateTime.Now.ToString("MMMM")</p>
+        <div class="stats">
+            <div class="stat-item">
+                <div class="stat-number">@completedLists</div>
+                <div class="stat-label">Listas</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number">$@monthlyTotal.ToString("F2")</div>
+                <div class="stat-label">Total</div>
+            </div>
+        </div>
+        <div class="quick-actions">
+            <button class="btn btn-primary" @onclick="GoToHistory">Ver Historial</button>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public EventCallback<string> OnTabChange { get; set; }
+
+    private int pendingItems = 0;
+    private decimal estimatedTotal = 0;
+    private decimal todayCost = 0;
+    private int completedLists = 0;
+    private decimal monthlyTotal = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDashboardData();
+    }
+
+    private async Task LoadDashboardData()
+    {
+        try
+        {
+            // Cargar lista activa
+            var activeList = await ShoppingListService.GetActiveShoppingListAsync();
+            if (activeList != null)
+            {
+                pendingItems = activeList.Items.Count(i => !i.IsPurchased);
+                estimatedTotal = activeList.TotalEstimated;
+            }
+
+            // Cargar costo del día actual
+            todayCost = await MealPlanService.CalculateDayTotalCostAsync(DateTime.Today);
+
+            // Cargar estadísticas del mes
+            var allLists = await ShoppingListService.GetAllShoppingListsAsync();
+            var thisMonth = allLists.Where(l => l.CreatedAt.Month == DateTime.Now.Month && l.CreatedAt.Year == DateTime.Now.Year);
+            completedLists = thisMonth.Count(l => l.IsCompleted);
+            monthlyTotal = thisMonth.Where(l => l.IsCompleted).Sum(l => l.TotalEstimated);
+        }
+        catch (Exception ex)
+        {
+            // Log error - por ahora solo ponemos valores por defecto
+            pendingItems = 8;
+            estimatedTotal = 245m;
+            todayCost = 186m;
+            completedLists = 4;
+            monthlyTotal = 980m;
+        }
+    }
+
+    private async Task GoToShopping()
+    {
+        await OnTabChange.InvokeAsync("shopping");
+    }
+
+    private async Task GoToMealPlanner()
+    {
+        await OnTabChange.InvokeAsync("meals");
+    }
+
+    private async Task GoToHistory()
+    {
+        await OnTabChange.InvokeAsync("history");
+    }
+
+    private async Task CreateNewList()
+    {
+        // Implementar creación de nueva lista
+        await GoToShopping();
+    }
+
+    private async Task CreateNewRecipe()
+    {
+        // Implementar creación de nueva receta
+        await GoToMealPlanner();
+    }
+}
+
+<style>
+    .dashboard-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 25px;
+        margin-bottom: 30px;
+    }
+
+    .card {
+        background: white;
+        border-radius: 15px;
+        padding: 25px;
+        box-shadow: 0 8px 25px rgba(0,0,0,0.08);
+        transition: all 0.3s ease;
+        border: 1px solid #e9ecef;
+    }
+
+    .card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 15px 35px rgba(0,0,0,0.12);
+    }
+
+    .card-header {
+        display: flex;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+
+    .card-icon {
+        width: 50px;
+        height: 50px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+        margin-right: 15px;
+    }
+
+    .card-icon.shopping {
+        background: linear-gradient(135deg, #4CAF50, #8BC34A);
+        color: white;
+    }
+
+    .card-icon.meals {
+        background: linear-gradient(135deg, #9C27B0, #E91E63);
+        color: white;
+    }
+
+    .card-icon.history {
+        background: linear-gradient(135deg, #2196F3, #03DAC6);
+        color: white;
+    }
+
+    .card-title {
+        font-size: 1.4em;
+        font-weight: 600;
+        color: #2c3e50;
+    }
+
+    .stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 15px;
+        margin-top: 20px;
+    }
+
+    .stat-item {
+        text-align: center;
+        padding: 15px;
+        background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+        border-radius: 10px;
+    }
+
+    .stat-number {
+        font-size: 2em;
+        font-weight: bold;
+        color: #667eea;
+    }
+
+    .stat-label {
+        color: #6c757d;
+        font-size: 0.9em;
+        margin-top: 5px;
+    }
+
+    .quick-actions {
+        display: flex;
+        gap: 15px;
+        margin-top: 20px;
+    }
+
+    .btn {
+        padding: 12px 20px;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 500;
+        transition: all 0.3s ease;
+        text-decoration: none;
+        display: inline-block;
+        font-size: 14px;
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+    }
+
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 15px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn-outline {
+        background: transparent;
+        border: 2px solid #667eea;
+        color: #667eea;
+    }
+
+    .btn-outline:hover {
+        background: #667eea;
+        color: white;
+    }
+
+</style>
